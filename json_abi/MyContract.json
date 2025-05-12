@@ -1,0 +1,183 @@
+[
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "_player",
+				"type": "address"
+			},
+			{
+				"internalType": "address",
+				"name": "_house",
+				"type": "address"
+			}
+		],
+		"stateMutability": "nonpayable",
+		"type": "constructor"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": false,
+				"internalType": "address",
+				"name": "winner",
+				"type": "address"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "result",
+				"type": "uint256"
+			}
+		],
+		"name": "GameResult",
+		"type": "event"
+	},
+	{
+		"inputs": [],
+		"name": "STAKE_AMOUNT",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "bytes32",
+				"name": "_commitHash",
+				"type": "bytes32"
+			}
+		],
+		"name": "commit",
+		"outputs": [],
+		"stateMutability": "payable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "game",
+		"outputs": [
+			{
+				"internalType": "address",
+				"name": "player",
+				"type": "address"
+			},
+			{
+				"internalType": "address",
+				"name": "house",
+				"type": "address"
+			},
+			{
+				"internalType": "bytes32",
+				"name": "playerCommit",
+				"type": "bytes32"
+			},
+			{
+				"internalType": "bytes32",
+				"name": "houseCommit",
+				"type": "bytes32"
+			},
+			{
+				"internalType": "bytes32",
+				"name": "playerSecret",
+				"type": "bytes32"
+			},
+			{
+				"internalType": "bytes32",
+				"name": "houseSecret",
+				"type": "bytes32"
+			},
+			{
+				"internalType": "uint256",
+				"name": "playerStake",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "houseStake",
+				"type": "uint256"
+			},
+			{
+				"internalType": "enum TwoPartySlotGame.State",
+				"name": "playerState",
+				"type": "uint8"
+			},
+			{
+				"internalType": "enum TwoPartySlotGame.State",
+				"name": "houseState",
+				"type": "uint8"
+			},
+			{
+				"internalType": "uint256",
+				"name": "result",
+				"type": "uint256"
+			},
+			{
+				"internalType": "address",
+				"name": "winner",
+				"type": "address"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "getContractBalance",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "string",
+				"name": "str",
+				"type": "string"
+			}
+		],
+		"name": "keccakHelperString",
+		"outputs": [
+			{
+				"internalType": "bytes32",
+				"name": "",
+				"type": "bytes32"
+			}
+		],
+		"stateMutability": "pure",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "bytes32",
+				"name": "_secret",
+				"type": "bytes32"
+			}
+		],
+		"name": "reveal",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "withdrawStuckFunds",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	}
+]
