@@ -2,6 +2,19 @@
 	{
 		"inputs": [
 			{
+				"internalType": "bytes32",
+				"name": "_commitHash",
+				"type": "bytes32"
+			}
+		],
+		"name": "commit",
+		"outputs": [],
+		"stateMutability": "payable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
 				"internalType": "address",
 				"name": "_player",
 				"type": "address"
@@ -35,29 +48,36 @@
 		"type": "event"
 	},
 	{
-		"inputs": [],
-		"name": "STAKE_AMOUNT",
-		"outputs": [
+		"inputs": [
 			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
+				"internalType": "bytes32",
+				"name": "_hash",
+				"type": "bytes32"
 			}
 		],
-		"stateMutability": "view",
+		"name": "postHash",
+		"outputs": [],
+		"stateMutability": "payable",
 		"type": "function"
 	},
 	{
 		"inputs": [
 			{
 				"internalType": "bytes32",
-				"name": "_commitHash",
+				"name": "_secret",
 				"type": "bytes32"
 			}
 		],
-		"name": "commit",
+		"name": "reveal",
 		"outputs": [],
-		"stateMutability": "payable",
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "withdrawStuckFunds",
+		"outputs": [],
+		"stateMutability": "nonpayable",
 		"type": "function"
 	},
 	{
@@ -81,17 +101,12 @@
 			},
 			{
 				"internalType": "bytes32",
-				"name": "houseCommit",
+				"name": "houseHash",
 				"type": "bytes32"
 			},
 			{
 				"internalType": "bytes32",
 				"name": "playerSecret",
-				"type": "bytes32"
-			},
-			{
-				"internalType": "bytes32",
-				"name": "houseSecret",
 				"type": "bytes32"
 			},
 			{
@@ -110,9 +125,9 @@
 				"type": "uint8"
 			},
 			{
-				"internalType": "enum TwoPartySlotGame.State",
-				"name": "houseState",
-				"type": "uint8"
+				"internalType": "bool",
+				"name": "housePosted",
+				"type": "bool"
 			},
 			{
 				"internalType": "uint256",
@@ -149,7 +164,7 @@
 				"type": "string"
 			}
 		],
-		"name": "keccakHelperString",
+		"name": "helper01String",
 		"outputs": [
 			{
 				"internalType": "bytes32",
@@ -164,20 +179,32 @@
 		"inputs": [
 			{
 				"internalType": "bytes32",
-				"name": "_secret",
+				"name": "b32",
 				"type": "bytes32"
 			}
 		],
-		"name": "reveal",
-		"outputs": [],
-		"stateMutability": "nonpayable",
+		"name": "helper02Commit",
+		"outputs": [
+			{
+				"internalType": "bytes32",
+				"name": "",
+				"type": "bytes32"
+			}
+		],
+		"stateMutability": "pure",
 		"type": "function"
 	},
 	{
 		"inputs": [],
-		"name": "withdrawStuckFunds",
-		"outputs": [],
-		"stateMutability": "nonpayable",
+		"name": "STAKE_AMOUNT",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
 		"type": "function"
 	}
 ]

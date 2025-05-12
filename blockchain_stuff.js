@@ -1,6 +1,6 @@
 const NETWORK_ID = 6342
 
-const MY_CONTRACT_ADDRESS = "0x9b8F8d66FDc979b84c09dd53d2eBBf4072358450"
+const MY_CONTRACT_ADDRESS = "0xF20493F4a532c2325D3BA6AfBD8892665831cd40"
 const MY_CONTRACT_ABI_PATH = "./json_abi/MyContract.json"
 var my_contract
 
@@ -187,8 +187,7 @@ async function updateGameState() {
     Your State: ${gameState.playerState === "0" ? "Not Started" : 
                  gameState.playerState === "1" ? "Committed" : "Revealed"}
     Your Stake: ${web3.utils.fromWei(gameState.playerStake, 'ether')} ETH
-    House State: ${gameState.houseState === "0" ? "Not Started" : 
-                  gameState.houseState === "1" ? "Committed" : "Revealed"}
+    House Status: ${gameState.housePosted ? "Hash Posted" : "Not Posted"}
     Required Stake: ${web3.utils.fromWei(stakeAmount, 'ether')} ETH
     ${gameState.winner !== "0x0000000000000000000000000000000000000000" ? 
       `Game Result: ${gameState.winner === gameState.player ? "You Won!" : "House Won!"}` : ''}
@@ -202,15 +201,40 @@ function generateRandomBytes32() {
 }
 
 function storeSecret(secret) {
+    console.log("Storing secret:", secret);
     localStorage.setItem('playerSecret', JSON.stringify({
         secret: secret,
         timestamp: Date.now()
     }));
-    updateCommitmentInfo();
+    // Add a small delay to ensure localStorage is updated
+    setTimeout(() => {
+        console.log("Updating commitment info after storing secret");
+        updateCommitmentInfo();
+    }, 100);
+}
+
+function updateCommitmentInfo() {
+    console.log("Updating commitment info");
+    const secretData = getStoredSecret();
+    console.log("Retrieved secret data:", secretData);
+    const commitmentElement = document.getElementById("commitment_info");
+    
+    if (secretData) {
+        const commitHash = web3.utils.soliditySha3(secretData.secret);
+        console.log("Generated commit hash:", commitHash);
+        commitmentElement.innerHTML = `
+            Secret: ${secretData.secret}<br>
+            Commitment Hash: ${commitHash}
+        `;
+    } else {
+        console.log("No secret data found");
+        commitmentElement.textContent = "No active commitment";
+    }
 }
 
 function getStoredSecret() {
     const secretData = localStorage.getItem('playerSecret');
+    console.log("Raw secret data from localStorage:", secretData);
     return secretData ? JSON.parse(secretData) : null;
 }
 
@@ -233,6 +257,7 @@ async function commit() {
             alert("You have already committed to this game!");
             return;
         }
+        console.log("a");
 
         // Generate random secret
         const secret = generateRandomBytes32();
@@ -242,6 +267,9 @@ async function commit() {
         const data = my_contract.methods.commit(commitHash).encodeABI();
         const nonce = await web3.eth.getTransactionCount(wallet.address, 'latest');
         const gasPrice = await web3.eth.getGasPrice();
+
+        console.log("b");
+
         
         const tx = {
             from: wallet.address,
@@ -253,10 +281,19 @@ async function commit() {
             data: data
         };
 
+        console.log(tx);
+
+
         const signedTx = await web3.eth.accounts.signTransaction(tx, wallet.privateKey);
+
+        console.log("c");
         const receipt = await web3.eth.sendSignedTransaction(signedTx.rawTransaction);
         
+        console.log("d");
+        console.log(receipt);
         if (receipt.status) {
+            console.log("polling");
+
             storeSecret(secret);
             document.getElementById("web3_message").textContent = "Commit successful! Waiting for house to reveal...";
             // Start polling for house reveal immediately after successful commit
@@ -277,13 +314,13 @@ async function commit() {
     }
 }
 
-// Add this new function to check game state
+// Update checkGameState function
 async function checkGameState() {
     try {
         const gameState = await my_contract.methods.game().call();
         return {
             playerState: gameState.playerState,
-            houseState: gameState.houseState,
+            housePosted: gameState.housePosted,
             player: gameState.player,
             house: gameState.house
         };
@@ -293,35 +330,71 @@ async function checkGameState() {
     }
 }
 
-// Update the reveal function to be simpler
-async function reveal() {
+// Update pollForHouseReveal function
+async function pollForHouseReveal() {
     const wallet = getLocalWallet();
     if (!wallet) {
         alert("No local wallet found!");
         return;
     }
 
+    const secretData = getStoredSecret();
+    if (!secretData) {
+        alert("No secret found! Please commit first.");
+        return;
+    }
+
+    const pollInterval = setInterval(async () => {
+        console.log("Polling for house hash...");
+        try {
+            const gameState = await checkGameState();
+            if (!gameState) return;
+
+            // If house has posted hash, we can reveal
+            if (gameState.housePosted) {
+                clearInterval(pollInterval);
+                await performReveal(wallet, secretData.secret);
+            }
+        } catch (error) {
+            console.error("Error in polling:", error);
+            clearInterval(pollInterval);
+        }
+    }, 2000);
+
+    setTimeout(() => {
+        clearInterval(pollInterval);
+        console.log("Polling timeout reached");
+    }, 300000);
+}
+
+// Add the perform reveal function
+async function performReveal(wallet, secret) {
     try {
-        const secretData = getStoredSecret();
-        if (!secretData) {
-            alert("No secret found! Please commit first.");
-            return;
-        }
+        const data = my_contract.methods.reveal(secret).encodeABI();
+        const nonce = await web3.eth.getTransactionCount(wallet.address, 'latest');
+        const gasPrice = await web3.eth.getGasPrice();
+        
+        const tx = {
+            from: wallet.address,
+            to: MY_CONTRACT_ADDRESS,
+            nonce: nonce,
+            gasPrice: gasPrice,
+            gas: 300000,
+            data: data
+        };
 
-        // Check if player can reveal
-        const gameState = await checkGameState();
-        if (!gameState || gameState.playerState !== "1") { // Not Committed
-            alert("You are not in a committed state!");
-            return;
-        }
-
-        // If house has already revealed, reveal immediately
-        if (gameState.houseState === "2") {
-            await performReveal(wallet, secretData.secret);
-        } else {
-            document.getElementById("web3_message").textContent = "Waiting for house to reveal...";
-            await pollForHouseReveal();
-        }
+        const signedTx = await web3.eth.accounts.signTransaction(tx, wallet.privateKey);
+        const receipt = await web3.eth.sendSignedTransaction(signedTx.rawTransaction);
+        
+        console.log("Reveal Transaction Receipt:", {
+            transactionHash: receipt.transactionHash,
+            blockNumber: receipt.blockNumber,
+            status: receipt.status ? "Confirmed" : "Failed",
+            gasUsed: receipt.gasUsed
+        });
+        
+        document.getElementById("web3_message").textContent = "Reveal successful!";
+        updateGameState();
     } catch (error) {
         console.error("Error in reveal:", error);
         document.getElementById("web3_message").textContent = "Error in reveal!";
@@ -391,92 +464,4 @@ async function depositEth(amount) {
     console.error("Deposit failed:", error);
     alert("Deposit failed!");
   }
-}
-
-// Update the display function to show both secret and derived commitment
-function updateCommitmentInfo() {
-    const secretData = getStoredSecret();
-    const commitmentElement = document.getElementById("commitment_info");
-    
-    if (secretData) {
-        const commitHash = web3.utils.soliditySha3(secretData.secret);
-        commitmentElement.innerHTML = `
-            Secret: ${secretData.secret}<br>
-            Commitment Hash: ${commitHash}
-        `;
-    } else {
-        commitmentElement.textContent = "No active commitment";
-    }
-}
-
-// Add polling function for house reveal
-async function pollForHouseReveal() {
-    const wallet = getLocalWallet();
-    if (!wallet) {
-        alert("No local wallet found!");
-        return;
-    }
-
-    const secretData = getStoredSecret();
-    if (!secretData) {
-        alert("No secret found! Please commit first.");
-        return;
-    }
-
-    const pollInterval = setInterval(async () => {
-        console.log("Polling for house reveal...");
-        try {
-            const gameState = await checkGameState();
-            if (!gameState) return;
-
-            // If house has revealed, we can reveal too
-            if (gameState.houseState === "2") { // Revealed
-                clearInterval(pollInterval);
-                await performReveal(wallet, secretData.secret);
-            }
-        } catch (error) {
-            console.error("Error in polling:", error);
-            clearInterval(pollInterval);
-        }
-    }, 2000); // Poll every 2 seconds
-
-    // Stop polling after 5 minutes (300000 ms)
-    setTimeout(() => {
-        clearInterval(pollInterval);
-        console.log("Polling timeout reached");
-    }, 300000);
-}
-
-// Add the perform reveal function
-async function performReveal(wallet, secret) {
-    try {
-        const data = my_contract.methods.reveal(secret).encodeABI();
-        const nonce = await web3.eth.getTransactionCount(wallet.address, 'latest');
-        const gasPrice = await web3.eth.getGasPrice();
-        
-        const tx = {
-            from: wallet.address,
-            to: MY_CONTRACT_ADDRESS,
-            nonce: nonce,
-            gasPrice: gasPrice,
-            gas: 300000,
-            data: data
-        };
-
-        const signedTx = await web3.eth.accounts.signTransaction(tx, wallet.privateKey);
-        const receipt = await web3.eth.sendSignedTransaction(signedTx.rawTransaction);
-        
-        console.log("Reveal Transaction Receipt:", {
-            transactionHash: receipt.transactionHash,
-            blockNumber: receipt.blockNumber,
-            status: receipt.status ? "Confirmed" : "Failed",
-            gasUsed: receipt.gasUsed
-        });
-        
-        document.getElementById("web3_message").textContent = "Reveal successful!";
-        updateGameState();
-    } catch (error) {
-        console.error("Error in reveal:", error);
-        document.getElementById("web3_message").textContent = "Error in reveal!";
-    }
 }

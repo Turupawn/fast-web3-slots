@@ -8,13 +8,12 @@ contract TwoPartySlotGame {
         address player;
         address house;
         bytes32 playerCommit;
-        bytes32 houseCommit;
+        bytes32 houseHash;
         bytes32 playerSecret;
-        bytes32 houseSecret;
         uint256 playerStake;
         uint256 houseStake;
         State playerState;
-        State houseState;
+        bool housePosted;
         uint256 result;
         address winner;
     }
@@ -45,51 +44,47 @@ contract TwoPartySlotGame {
         game.house = _house;
     }
 
-    /// @dev Player and house commit to the game by sending ETH and a hash of their secret
+    /// @dev Player commits to the game by sending ETH and a hash of their secret
     function commit(bytes32 _commitHash) external payable hasStaked {
-        if (msg.sender == game.player) {
-            require(game.playerState == State.NotStarted, "Player already committed");
-            game.playerCommit = _commitHash;
-            game.playerStake = msg.value;
-            game.playerState = State.Committed;
-        } else if (msg.sender == game.house) {
-            require(game.houseState == State.NotStarted, "House already committed");
-            game.houseCommit = _commitHash;
-            game.houseStake = msg.value;
-            game.houseState = State.Committed;
-        } else {
-            revert("Unknown sender");
-        }
+        require(msg.sender == game.player, "Only player can commit");
+        require(game.playerState == State.NotStarted, "Player already committed");
+        game.playerCommit = _commitHash;
+        game.playerStake = msg.value;
+        game.playerState = State.Committed;
     }
 
-    /// @dev Reveal the secret and validate the commitment. The result is computed once both sides reveal.
-    function reveal(bytes32 _secret) external {
-        if (msg.sender == game.player) {
-            require(game.playerState == State.Committed, "Player not ready to reveal");
-            require(_secret == game.playerCommit, "Player secret invalid");
-            game.playerState = State.Revealed;
-        } else if (msg.sender == game.house) {
-            require(game.houseState == State.Committed, "House not ready to reveal");
-            require(_secret == game.houseCommit, "House secret invalid");
-            game.houseState = State.Revealed;
-        } else {
-            revert("Unknown sender");
-        }
+    /// @dev House posts their hash and stake
+    function postHash(bytes32 _hash) external payable hasStaked {
+        require(msg.sender == game.house, "Only house can post hash");
+        require(game.playerState == State.Committed, "Player must commit first");
+        require(!game.housePosted, "House already posted hash");
+        game.houseHash = _hash;
+        game.houseStake = msg.value;
+        game.housePosted = true;
+    }
 
-        // Generate result if both revealed
-        if (game.playerState == State.Revealed && game.houseState == State.Revealed) {
-            uint256 xorResult = (uint256(game.playerSecret) ^ uint256(game.houseSecret)) & 0xFFFFFFFF;
-            
-            address winner = (xorResult % 2 == 0) ? game.player : game.house;
-            uint256 totalStake = game.houseStake + game.playerStake;
-            
-            // Reset game state BEFORE transfer
-            _resetGame();
-            
-            // Emit event and transfer after reset
-            emit GameResult(winner, xorResult);
-            payable(winner).transfer(totalStake);
-        }
+    /// @dev Player reveals their secret and the result is computed
+    function reveal(bytes32 _secret) external {
+        require(msg.sender == game.player, "Only player can reveal");
+        require(game.playerState == State.Committed, "Player not ready to reveal");
+        require(game.housePosted, "House must post hash first");
+        require(keccak256(abi.encode(_secret)) == game.playerCommit, "Player secret invalid");
+        
+        game.playerSecret = _secret;
+        game.playerState = State.Revealed;
+        
+        // Generate result using house's hash directly
+        uint256 xorResult = (uint256(_secret) ^ uint256(game.houseHash)) & 0xFFFFFFFF;
+        
+        address winner = (xorResult % 2 == 0) ? game.player : game.house;
+        uint256 totalStake = game.houseStake + game.playerStake;
+        
+        // Reset game state BEFORE transfer
+        _resetGame();
+        
+        // Emit event and transfer after reset
+        emit GameResult(winner, xorResult);
+        payable(winner).transfer(totalStake);
     }
 
     /// @dev Internal function to reset the game
@@ -98,13 +93,12 @@ contract TwoPartySlotGame {
         address house = game.house;
         
         game.playerCommit = bytes32(0);
-        game.houseCommit = bytes32(0);
+        game.houseHash = bytes32(0);
         game.playerSecret = bytes32(0);
-        game.houseSecret = bytes32(0);
         game.playerStake = 0;
         game.houseStake = 0;
         game.playerState = State.NotStarted;
-        game.houseState = State.NotStarted;
+        game.housePosted = false;
         game.result = 0;
         game.winner = address(0);
         
@@ -126,17 +120,12 @@ contract TwoPartySlotGame {
         payable(msg.sender).transfer(balance);
     }
 
-    function helperKeccakString(string memory str) public pure returns(bytes32)
-    {
-        return keccak256(abi.encodePacked(str));
-    }
-
-    function helperString(string memory str) public pure returns(bytes32)
+    function helper01String(string memory str) public pure returns(bytes32)
     {
         return bytes32(abi.encodePacked(str));
     }
 
-    function HelperBytes32(bytes32 b32) public pure returns(bytes32)
+    function helper02Commit(bytes32 b32) public pure returns(bytes32)
     {
         return keccak256(abi.encodePacked(b32));
     }
